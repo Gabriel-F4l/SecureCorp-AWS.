@@ -35,3 +35,11 @@ cdk.out/
 # Sistema operacional
 .DS_Store
 Thumbs.db
+# Backups locais
+*_backup.py
+
+# Templates CloudFormation gerados
+securecorp-check.json
+
+# Script auxiliar local
+source.bat
