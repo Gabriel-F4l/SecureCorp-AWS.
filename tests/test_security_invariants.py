@@ -3,27 +3,19 @@
 No AWS account or deployment is required.
 """
 import json
-import subprocess
-import sys
-from pathlib import Path
 
+import aws_cdk as cdk
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from secure_corp_aws.secure_corp_aws_stack import SecureCorpAWSStack
 
 
 @pytest.fixture(scope="module")
-def template(tmp_path_factory):
-    out = tmp_path_factory.mktemp("cdk-out")
-    subprocess.run(
-        [sys.executable, "app.py", "--output", str(out)],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    path = out / "SecureCorpAWSStack.template.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+def template():
+    app = cdk.App()
+    SecureCorpAWSStack(app, "SecureCorpAWSStack")
+    assembly = app.synth()
+    return assembly.get_stack_by_name("SecureCorpAWSStack").template
 
 
 def resources(template, resource_type):
