@@ -1,15 +1,14 @@
+"""Unit tests for the current SecureCorp AWS CDK stack."""
 import aws_cdk as core
 import aws_cdk.assertions as assertions
 
-from secure_corp_aws.secure_corp_aws_stack import SecureCorpAwsStack
+from secure_corp_aws.secure_corp_aws_stack import SecureCorpAWSStack
 
-# example tests. To run these tests, uncomment this file along with the example
-# resource in secure_corp_aws/secure_corp_aws_stack.py
-def test_sqs_queue_created():
+
+def test_securecorp_vpc_created():
     app = core.App()
-    stack = SecureCorpAwsStack(app, "secure-corp-aws")
+    stack = SecureCorpAWSStack(app, "SecureCorpAWSStack")
     template = assertions.Template.from_stack(stack)
-
-#     template.has_resource_properties("AWS::SQS::Queue", {
-#         "VisibilityTimeout": 300
-#     })
+    template.has_resource_properties("AWS::EC2::VPC", {
+        "CidrBlock": "10.20.0.0/16",
+    })
