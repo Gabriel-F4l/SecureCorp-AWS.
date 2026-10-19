@@ -267,6 +267,15 @@ class SecureCorpAWSStack(Stack):
             require_imdsv2=True,
         )
 
+        # Garante IMDSv2 no template CloudFormation sintetizado.
+        # O teste de seguranca valida MetadataOptions.HttpTokens=required.
+        cfn_servidor_app = servidor_app.node.default_child
+        if not isinstance(cfn_servidor_app, ec2.CfnInstance):
+            raise TypeError("Recurso EC2 inesperado no construct SecureCorpAppServer")
+        cfn_servidor_app.add_property_override(
+            "MetadataOptions.HttpTokens", "required"
+        )
+
         CfnOutput(
             self,
             "SecureCorpAppServerId",
