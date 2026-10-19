@@ -1,0 +1,37 @@
+# =====================================
+# SecureCorp Automotive - Git Ignore
+# =====================================
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# AWS CDK
+cdk.out/
+.cdk.staging/
+
+# Credenciais e segredos
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+*credentials*
+
+# IDE
+.vscode/
+.idea/
+
+# Arquivos temporarios
+*.log
+*.swp
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
