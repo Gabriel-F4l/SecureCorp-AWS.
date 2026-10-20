@@ -1,4 +1,3 @@
-
 from aws_cdk import (
     CfnOutput,
     CfnParameter,
@@ -376,7 +375,32 @@ class SecureCorpAWSStack(Stack):
         )
 
         # =====================================================
-        # 13. OUTPUTS CLOUDFORMATION
+        # 13. CLOUDWATCH DASHBOARD
+        # =====================================================
+
+        dashboard = cloudwatch.Dashboard(
+            self,
+            "SecureCorpOperationsDashboard",
+            dashboard_name="SecureCorp-Cloud-Operations",
+        )
+
+        dashboard.add_widgets(
+            cloudwatch.GraphWidget(
+                title="EC2 - Utilizacao de CPU",
+                left=[metrica_cpu],
+                width=12,
+                height=6,
+            ),
+            cloudwatch.AlarmStatusWidget(
+                title="Status dos Alarmes",
+                alarms=[alarme_cpu],
+                width=12,
+                height=6,
+            ),
+        )
+
+        # =====================================================
+        # 14. OUTPUTS CLOUDFORMATION
         # =====================================================
 
         CfnOutput(
