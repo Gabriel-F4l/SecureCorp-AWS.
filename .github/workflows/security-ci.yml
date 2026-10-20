@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: securecorp-ci-${{ github.workflow }}-${{ github.ref }}
+  group: securecorp-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,11 +27,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # 1. Checkout do repositorio
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configurar Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -41,82 +39,85 @@ jobs:
             requirements.txt
             requirements-dev.txt
 
-      # 3. Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      # 4. Instalar AWS CDK CLI
       - name: Install AWS CDK
         run: |
           npm install --global aws-cdk
           cdk --version
 
-      # 5. Instalar dependencias Python
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-dev.txt
 
-      # 6. Verificar sintaxe Python
       - name: Validate Python syntax
         run: |
           python -m compileall -q app.py secure_corp_aws tests
 
-      # 7. Gerar template CloudFormation
-      # Deve executar antes dos testes
       - name: Synthesize CloudFormation
         run: |
           cdk synth --output cdk.out --quiet
 
-      # 8. Validar arquivo gerado
+      - name: Inspect generated templates
+        run: |
+          echo "Generated CloudFormation templates:"
+          find cdk.out -maxdepth 1 \
+            -type f -name "*.template.json" -print
+
       - name: Verify CloudFormation template
         run: |
-          echo "Checking CloudFormation template"
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-          ls -lah cdk.out/
+          templates = list(
+              Path("cdk.out").glob("*.template.json")
+          )
 
-          test -f \
-            cdk.out/SecureCorpAWSStack.template.json
+          assert len(templates) == 1, (
+              f"Expected one template, found: {templates}"
+          )
 
-          python -m json.tool \
-            cdk.out/SecureCorpAWSStack.template.json \
-            > /dev/null
+          with templates[0].open(
+              encoding="utf-8-sig"
+          ) as file:
+              data = json.load(file)
 
-          echo "CloudFormation template is valid JSON"
+          assert isinstance(data.get("Resources"), dict)
 
-      # 9. Executar testes automatizados
+          print(f"Validated: {templates[0]}")
+          PY
+
       - name: Run automated security tests
         run: |
           python -m pytest -q
 
-      # 10. Executar auditoria personalizada
       - name: Run SecureCorp security audit
         run: |
           python audit_security.py
 
-      # 11. Analise estatica de seguranca
       - name: Bandit security scan
         run: |
           python -m pip install "bandit>=1.7,<2"
           bandit -r app.py secure_corp_aws -f txt
         continue-on-error: true
 
-      # 12. Analise de qualidade Python
       - name: Ruff lint
         run: |
           python -m pip install "ruff>=0.9,<1"
           ruff check app.py secure_corp_aws tests
         continue-on-error: true
 
-      # 13. Publicar template CloudFormation
       - name: Upload CloudFormation artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: securecorp-cloudformation
-          path: cdk.out/SecureCorpAWSStack.template.json
+          path: cdk.out/*.template.json
           if-no-files-found: error
           retention-days: 7
