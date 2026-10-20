@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+﻿
 import aws_cdk as cdk
 
 from secure_corp_aws.secure_corp_aws_stack import SecureCorpAWSStack
