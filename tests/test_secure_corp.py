@@ -354,24 +354,35 @@ def test_vpc_endpoints():
 # TESTE 5 - CLOUDWATCH + SNS
 # ============================================================
 
+
 def test_cloudwatch_sns():
+    """Valida os tres alarmes CloudWatch e a integracao SNS."""
 
     template = carregar_template()
 
     alarmes = obter_recursos(
         template, "AWS::CloudWatch::Alarm"
     )
-
     topicos = obter_recursos(
         template, "AWS::SNS::Topic"
     )
-
     assinaturas = obter_recursos(
         template, "AWS::SNS::Subscription"
     )
 
-    assert len(alarmes) == 1, (
-        "Esperado exatamente um alarme CloudWatch"
+    nomes_esperados = {
+        "SecureCorp-EC2-HighCPU",
+        "SecureCorp-EC2-SystemStatusFailed",
+        "SecureCorp-EC2-InstanceStatusFailed",
+    }
+
+    alarmes_por_nome = {
+        recurso["Properties"]["AlarmName"]: recurso["Properties"]
+        for recurso in alarmes.values()
+    }
+
+    assert set(alarmes_por_nome) == nomes_esperados, (
+        f"Alarmes incorretos: {set(alarmes_por_nome)}"
     )
 
     assert len(topicos) == 1, (
@@ -384,62 +395,60 @@ def test_cloudwatch_sns():
 
     topico_id = next(iter(topicos.keys()))
 
-    alarme = next(iter(alarmes.values()))["Properties"]
+    # Verifica que todos os alarmes notificam o SNS
+    for nome, alarme in alarmes_por_nome.items():
+        assert alarme.get("Namespace") == "AWS/EC2", (
+            f"Namespace incorreto: {nome}"
+        )
 
+        assert {"Ref": topico_id} in alarme.get(
+            "AlarmActions", []
+        ), f"Alarme sem notificacao SNS: {nome}"
+
+        assert alarme.get("TreatMissingData") == "missing", (
+            f"Tratamento de dados ausentes incorreto: {nome}"
+        )
+
+    # Alarme de CPU
+    cpu = alarmes_por_nome["SecureCorp-EC2-HighCPU"]
+
+    assert cpu["MetricName"] == "CPUUtilization"
+    assert cpu["Statistic"] == "Average"
+    assert cpu["Threshold"] == 80
+    assert cpu["Period"] == 300
+    assert cpu["EvaluationPeriods"] == 1
+    assert cpu["DatapointsToAlarm"] == 1
+    assert cpu["ComparisonOperator"] == "GreaterThanThreshold"
+
+    # Alarmes de integridade EC2
+    metricas_status = {
+        "SecureCorp-EC2-SystemStatusFailed":
+            "StatusCheckFailed_System",
+        "SecureCorp-EC2-InstanceStatusFailed":
+            "StatusCheckFailed_Instance",
+    }
+
+    for nome, metrica in metricas_status.items():
+        alarme = alarmes_por_nome[nome]
+
+        assert alarme["MetricName"] == metrica
+        assert alarme["Statistic"] == "Maximum"
+        assert alarme["Threshold"] == 0
+        assert alarme["Period"] == 60
+        assert alarme["EvaluationPeriods"] == 2
+        assert alarme["DatapointsToAlarm"] == 2
+        assert (
+            alarme["ComparisonOperator"]
+            == "GreaterThanThreshold"
+        )
+
+    # Assinatura de notificacoes SNS
     assinatura = next(
         iter(assinaturas.values())
     )["Properties"]
 
-    # Validar metrica da EC2
-    assert alarme.get("Namespace") == "AWS/EC2", (
-        "Namespace CloudWatch incorreto"
-    )
-
-    assert alarme.get("MetricName") == "CPUUtilization", (
-        "Metrica de CPU nao encontrada"
-    )
-
-    assert alarme.get("Statistic") == "Average", (
-        "Estatistica do alarme incorreta"
-    )
-
-    # CPU maior que 80% por 5 minutos
-    assert alarme.get("Threshold") == 80, (
-        "Threshold diferente de 80%"
-    )
-
-    assert alarme.get("Period") == 300, (
-        "Periodo diferente de 300 segundos"
-    )
-
-    assert alarme.get("EvaluationPeriods") == 1, (
-        "EvaluationPeriods diferente de 1"
-    )
-
-    assert alarme.get(
-        "ComparisonOperator"
-    ) == "GreaterThanThreshold", (
-        "Operador de comparacao incorreto"
-    )
-
-    # Associacao CloudWatch -> SNS
-    acoes = alarme.get("AlarmActions", [])
-
-    assert {"Ref": topico_id} in acoes, (
-        "Alarme nao referencia o topico SNS"
-    )
-
-    # Assinatura SNS
-    assert assinatura.get("Protocol") == "email", (
-        "Assinatura SNS nao utiliza e-mail"
-    )
-
-    assert assinatura.get("TopicArn") == {
-        "Ref": topico_id
-    }, (
-        "Assinatura nao referencia o topico SNS"
-    )
-
+    assert assinatura["Protocol"] == "email"
+    assert assinatura["TopicArn"] == {"Ref": topico_id}
     assert assinatura.get("Endpoint"), (
-        "Assinatura SNS sem destinatario configurado"
+        "Assinatura SNS sem destinatario"
     )
