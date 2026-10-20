@@ -2,7 +2,6 @@
 import json
 from pathlib import Path
 
-
 # ============================================================
 # SECURECORP AUTOMOTIVE
 # TESTES AUTOMATIZADOS DE INFRAESTRUTURA AWS

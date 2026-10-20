@@ -1,16 +1,30 @@
 
 from aws_cdk import (
-    Stack,
     CfnOutput,
     CfnParameter,
-    RemovalPolicy,
     Duration,
-    aws_ec2 as ec2,
-    aws_iam as iam,
-    aws_s3 as s3,
+    RemovalPolicy,
+    Stack,
+)
+from aws_cdk import (
     aws_cloudwatch as cloudwatch,
+)
+from aws_cdk import (
     aws_cloudwatch_actions as cloudwatch_actions,
+)
+from aws_cdk import (
+    aws_ec2 as ec2,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_s3 as s3,
+)
+from aws_cdk import (
     aws_sns as sns,
+)
+from aws_cdk import (
     aws_sns_subscriptions as subscriptions,
 )
 from constructs import Construct

@@ -1,6 +1,6 @@
 """Unit tests for the current SecureCorp AWS CDK stack."""
 import aws_cdk as core
-import aws_cdk.assertions as assertions
+from aws_cdk import assertions
 
 from secure_corp_aws.secure_corp_aws_stack import SecureCorpAWSStack
 
