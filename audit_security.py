@@ -7,7 +7,7 @@ arquivo = Path("securecorp-check.json")
 if not arquivo.exists():
     raise SystemExit("Template nao encontrado. Execute cdk synth primeiro.")
 
-template = json.loads(arquivo.read_text(encoding="utf-16"))
+template = json.loads(arquivo.read_text(encoding="utf-8-sig"))
 recursos = template.get("Resources", {})
 
 def verificar(nome, condicao):

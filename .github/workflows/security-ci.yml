@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/security-ci
+
   pull_request:
 
 permissions:
@@ -17,34 +18,70 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Baixar o codigo do repositorio
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Configurar Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
+      # 3. Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
+      # 4. Instalar AWS CDK CLI
       - name: Install AWS CDK
         run: npm install -g aws-cdk
 
+      # 5. Instalar dependencias Python
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
 
+      # 6. Validar sintaxe Python
       - name: Validate Python syntax
         run: |
           python -m compileall -q app.py secure_corp_aws tests
 
-      - name: Run automated tests
-        run: python -m pytest -q
-
+      # 7. Gerar template CloudFormation
+      # IMPORTANTE: deve executar antes do pytest
       - name: Synthesize CloudFormation
-        run: cdk synth --quiet
+        run: |
+          cdk synth --output cdk.out --quiet
+
+      # 8. Verificar existencia do template
+      - name: Verify CloudFormation template
+        run: |
+          test -f cdk.out/SecureCorpAWSStack.template.json
+          echo "CloudFormation template generated successfully"
+
+      # 9. Executar testes automatizados
+      - name: Run automated security tests
+        run: |
+          python -m pytest -q
+
+      # 10. Executar auditoria de seguranca
+      - name: Run security audit
+        run: |
+          python audit_security.py
+
+      # 11. Publicar template como artefato
+      - name: Upload CloudFormation artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securecorp-cloudformation
+          path: cdk.out/SecureCorpAWSStack.template.json
+          retention-days: 7
+
