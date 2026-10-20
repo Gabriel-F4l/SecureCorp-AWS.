@@ -1,16 +1,30 @@
 
 from aws_cdk import (
-    Stack,
     CfnOutput,
     CfnParameter,
-    RemovalPolicy,
     Duration,
-    aws_ec2 as ec2,
-    aws_iam as iam,
-    aws_s3 as s3,
+    RemovalPolicy,
+    Stack,
+)
+from aws_cdk import (
     aws_cloudwatch as cloudwatch,
+)
+from aws_cdk import (
     aws_cloudwatch_actions as cloudwatch_actions,
+)
+from aws_cdk import (
+    aws_ec2 as ec2,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_s3 as s3,
+)
+from aws_cdk import (
     aws_sns as sns,
+)
+from aws_cdk import (
     aws_sns_subscriptions as subscriptions,
 )
 from constructs import Construct
@@ -265,6 +279,15 @@ class SecureCorpAWSStack(Stack):
             security_group=sg_servidores,
             role=role_servidores,
             require_imdsv2=True,
+        )
+
+        # Garante IMDSv2 no template CloudFormation sintetizado.
+        # O teste de seguranca valida MetadataOptions.HttpTokens=required.
+        cfn_servidor_app = servidor_app.node.default_child
+        if not isinstance(cfn_servidor_app, ec2.CfnInstance):
+            raise TypeError("Recurso EC2 inesperado no construct SecureCorpAppServer")
+        cfn_servidor_app.add_property_override(
+            "MetadataOptions.HttpTokens", "required"
         )
 
         CfnOutput(

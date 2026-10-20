@@ -1,124 +1,316 @@
 
 import json
+import sys
 from pathlib import Path
 
-arquivo = Path("securecorp-check.json")
+# ==========================================================
+# SECURECORP AWS - AUTOMATED SECURITY AUDIT
+# ==========================================================
 
-if not arquivo.exists():
-    raise SystemExit("Template nao encontrado. Execute cdk synth primeiro.")
+BASE_DIR = Path(__file__).resolve().parent
+CDK_OUT = BASE_DIR / "cdk.out"
 
-template = json.loads(arquivo.read_text(encoding="utf-16"))
-recursos = template.get("Resources", {})
+aprovados = 0
+falhas = 0
+alertas = 0
+
 
 def verificar(nome, condicao):
-    status = "OK" if condicao else "FALHA"
-    print(f"[{status}] {nome}")
+    global aprovados, falhas
 
-buckets = [
-    r["Properties"]
-    for r in recursos.values()
-    if r.get("Type") == "AWS::S3::Bucket"
-]
+    if condicao:
+        aprovados += 1
+        print(f"[OK] {nome}")
+    else:
+        falhas += 1
+        print(f"[FALHA] {nome}")
 
-endpoints = [
-    r["Properties"]
-    for r in recursos.values()
-    if r.get("Type") == "AWS::EC2::VPCEndpoint"
-]
 
-print("\n=== SECURECORP SECURITY AUDIT ===\n")
+def alerta(mensagem):
+    global alertas
+    alertas += 1
+    print(f"[ALERTA] {mensagem}")
 
-verificar("Bucket S3 presente", len(buckets) > 0)
 
-for bucket in buckets:
-    bloqueio = bucket.get("PublicAccessBlockConfiguration", {})
-    verificar(
-        "S3 com acesso publico bloqueado",
-        all(bloqueio.get(k) is True for k in [
+def carregar_template():
+    if not CDK_OUT.is_dir():
+        raise SystemExit(
+            f"Diretorio nao encontrado: {CDK_OUT}\n"
+            "Execute: cdk synth --output cdk.out"
+        )
+
+    templates = sorted(CDK_OUT.glob("*.template.json"))
+
+    if len(templates) != 1:
+        encontrados = [p.name for p in templates]
+        raise SystemExit(
+            "Esperado exatamente um template CloudFormation. "
+            f"Encontrados: {encontrados}"
+        )
+
+    arquivo = templates[0]
+
+    try:
+        template = json.loads(
+            arquivo.read_text(encoding="utf-8-sig")
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError) as erro:
+        raise SystemExit(
+            f"Erro ao carregar template: {erro}"
+        ) from erro
+
+    if not isinstance(template, dict):
+        raise SystemExit("Template CloudFormation invalido.")
+
+    recursos = template.get("Resources")
+
+    if not isinstance(recursos, dict):
+        raise SystemExit("Secao Resources invalida.")
+
+    print(f"[OK] Template carregado: {arquivo.name}")
+    print(f"[INFO] Recursos encontrados: {len(recursos)}")
+
+    return recursos
+
+
+def obter_recursos(recursos, tipo):
+    return [
+        recurso.get("Properties", {})
+        for recurso in recursos.values()
+        if recurso.get("Type") == tipo
+    ]
+
+
+def como_lista(valor):
+    if valor is None:
+        return []
+    if isinstance(valor, list):
+        return valor
+    return [valor]
+
+
+def auditoria_s3(recursos):
+    print("\n=== AUDITORIA S3 ===\n")
+
+    buckets = obter_recursos(
+        recursos, "AWS::S3::Bucket"
+    )
+
+    verificar("Bucket S3 presente", bool(buckets))
+
+    for bucket in buckets:
+        bloqueio = bucket.get(
+            "PublicAccessBlockConfiguration", {}
+        )
+
+        chaves = [
             "BlockPublicAcls",
             "BlockPublicPolicy",
             "IgnorePublicAcls",
             "RestrictPublicBuckets"
-        ])
+        ]
+
+        verificar(
+            "S3 com acesso publico bloqueado",
+            all(bloqueio.get(k) is True for k in chaves)
+        )
+
+        verificar(
+            "Versionamento habilitado",
+            bucket.get(
+                "VersioningConfiguration", {}
+            ).get("Status") == "Enabled"
+        )
+
+        verificar(
+            "Criptografia configurada",
+            bool(
+                bucket.get(
+                    "BucketEncryption", {}
+                ).get("ServerSideEncryptionConfiguration")
+            )
+        )
+
+
+def auditoria_endpoints(recursos):
+    print("\n=== AUDITORIA VPC ENDPOINT ===\n")
+
+    endpoints = obter_recursos(
+        recursos, "AWS::EC2::VPCEndpoint"
     )
+
+    gateways = [
+        endpoint
+        for endpoint in endpoints
+        if endpoint.get("VpcEndpointType") == "Gateway"
+        and "s3" in json.dumps(
+            endpoint.get("ServiceName", {})
+        ).lower()
+    ]
 
     verificar(
-        "Versionamento habilitado",
-        bucket.get("VersioningConfiguration", {}).get("Status") == "Enabled"
+        "Gateway Endpoint S3 configurado",
+        bool(gateways)
     )
 
-    verificar(
-        "Criptografia configurada",
-        bool(bucket.get("BucketEncryption"))
-    )
+    for gateway in gateways:
+        rotas = gateway.get("RouteTableIds", [])
 
-verificar(
-    "Gateway Endpoint S3 configurado",
-    any(
-        e.get("VpcEndpointType") == "Gateway"
-        and "s3" in json.dumps(e.get("ServiceName", {})).lower()
-        and len(e.get("RouteTableIds", [])) == 2
-        for e in endpoints
-    )
-)
-
-print("\nAuditoria local concluida.")
+        verificar(
+            "Gateway associado a duas Route Tables",
+            len(rotas) == 2
+        )
 
 
-print("\n=== AUDITORIA IAM ===\n")
+def auditoria_iam(recursos):
+    print("\n=== AUDITORIA IAM ===\n")
 
-policies = [
-    r["Properties"]
-    for r in recursos.values()
-    if r.get("Type") == "AWS::IAM::Policy"
-]
+    documentos = []
 
-for policy in policies:
-    statements = policy.get("PolicyDocument", {}).get("Statement", [])
-
-    if isinstance(statements, dict):
-        statements = [statements]
-
-    for statement in statements:
-        actions = statement.get("Action", [])
-        if isinstance(actions, str):
-            actions = [actions]
-
-        effect = statement.get("Effect")
-        resource = statement.get("Resource")
-
-        if effect == "Allow" and "*" in actions:
-            print("[ALERTA] Permissao global de acao detectada!")
-        elif effect == "Allow":
-            print("[INFO] Acoes permitidas:", actions)
-            print("[INFO] Recursos autorizados:", resource)    
-print("\n=== AUDITORIA SECURITY GROUP ===\n")
-
-for nome, recurso in recursos.items():
-
-    tipo = recurso.get("Type", "")
-
-    if tipo not in [
-        "AWS::EC2::SecurityGroupIngress",
-        "AWS::EC2::SecurityGroupEgress"
+    for tipo in [
+        "AWS::IAM::Policy",
+        "AWS::IAM::ManagedPolicy"
     ]:
-        continue
+        for policy in obter_recursos(recursos, tipo):
+            documentos.append(
+                policy.get("PolicyDocument", {})
+            )
 
-    propriedades = recurso.get("Properties", {})
+    for role in obter_recursos(
+        recursos, "AWS::IAM::Role"
+    ):
+        for policy in role.get("Policies", []):
+            documentos.append(
+                policy.get("PolicyDocument", {})
+            )
 
-    cidr = propriedades.get("CidrIp")
-    porta = propriedades.get("FromPort")
-    protocolo = propriedades.get("IpProtocol")
+    verificar(
+        "Politicas IAM encontradas",
+        bool(documentos)
+    )
 
-    print(f"\nRecurso: {nome}")
-    print(f"Tipo: {tipo}")
-    print(f"Origem/Destino: {cidr}")
-    print(f"Porta inicial: {porta}")
-    print(f"Protocolo: {protocolo}")
+    for documento in documentos:
+        for statement in como_lista(
+            documento.get("Statement", [])
+        ):
+            if not isinstance(statement, dict):
+                continue
 
-    if cidr == "0.0.0.0/0":
-        print("[ALERTA] Regra aberta para qualquer IPv4")
-    elif cidr:
-        print("[INFO] Regra com CIDR especifico")
-    else:
-        print("[INFO] Verificar outros tipos de destino")
+            if statement.get("Effect") != "Allow":
+                continue
+
+            actions = como_lista(
+                statement.get("Action", [])
+            )
+
+            resources = como_lista(
+                statement.get("Resource", [])
+            )
+
+            print(f"[INFO] Acoes: {actions}")
+            print(f"[INFO] Recursos: {resources}")
+
+            if "*" in actions:
+                alerta("IAM permite todas as acoes")
+
+            if "*" in resources:
+                alerta("IAM permite Resource '*'")
+
+            if any(
+                isinstance(a, str) and a.endswith(":*")
+                for a in actions
+            ):
+                alerta("IAM possui permissao ampla por servico")
+
+
+def auditoria_security_groups(recursos):
+    print("\n=== AUDITORIA SECURITY GROUP ===\n")
+
+    regras = []
+
+    for nome, recurso in recursos.items():
+        tipo = recurso.get("Type", "")
+        props = recurso.get("Properties", {})
+
+        if tipo in [
+            "AWS::EC2::SecurityGroupIngress",
+            "AWS::EC2::SecurityGroupEgress"
+        ]:
+            regras.append((nome, tipo, props))
+
+        elif tipo == "AWS::EC2::SecurityGroup":
+            for regra in props.get("SecurityGroupIngress", []):
+                regras.append(
+                    (nome, "AWS::EC2::SecurityGroupIngress", regra)
+                )
+
+            for regra in props.get("SecurityGroupEgress", []):
+                regras.append(
+                    (nome, "AWS::EC2::SecurityGroupEgress", regra)
+                )
+
+    verificar(
+        "Regras de Security Group encontradas",
+        bool(regras)
+    )
+
+    for nome, tipo, props in regras:
+        direcao = (
+            "ENTRADA" if tipo.endswith("Ingress")
+            else "SAIDA"
+        )
+
+        cidr = props.get("CidrIp")
+        ipv6 = props.get("CidrIpv6")
+        porta = props.get("FromPort")
+        protocolo = props.get("IpProtocol")
+
+        print(f"\nRecurso: {nome}")
+        print(f"Direcao: {direcao}")
+        print(f"CIDR IPv4: {cidr}")
+        print(f"CIDR IPv6: {ipv6}")
+        print(f"Porta: {porta}")
+        print(f"Protocolo: {protocolo}")
+
+        if cidr == "0.0.0.0/0":
+            alerta(f"{nome}: acesso IPv4 irrestrito")
+
+        if ipv6 == "::/0":
+            alerta(f"{nome}: acesso IPv6 irrestrito")
+
+        if not cidr and not ipv6:
+            print(
+                "[INFO] Destino pode usar SG ou Prefix List"
+            )
+
+
+def main():
+    print("\n====================================")
+    print(" SECURECORP AWS - SECURITY AUDIT")
+    print("====================================\n")
+
+    recursos = carregar_template()
+
+    auditoria_s3(recursos)
+    auditoria_endpoints(recursos)
+    auditoria_iam(recursos)
+    auditoria_security_groups(recursos)
+
+    print("\n====================================")
+    print(" RESUMO DA AUDITORIA")
+    print("====================================")
+
+    print(f"Verificacoes aprovadas: {aprovados}")
+    print(f"Verificacoes reprovadas: {falhas}")
+    print(f"Alertas: {alertas}")
+
+    if falhas:
+        print("\n[FAIL] Auditoria reprovada.")
+        return 1
+
+    print("\n[OK] Auditoria concluida.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
