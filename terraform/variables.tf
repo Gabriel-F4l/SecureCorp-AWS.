@@ -16,3 +16,22 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.20.0.0/16"
 }
+
+# ------------------------------------------------------------
+# AVAILABILITY ZONES - SECURECORP AWS
+# ------------------------------------------------------------
+
+variable "availability_zone_ids" {
+  description = "IDs de duas Availability Zones para arquitetura Multi-AZ"
+  type        = list(string)
+
+  validation {
+    condition = (
+      length(var.availability_zone_ids) == 2 &&
+      length(distinct(var.availability_zone_ids)) == 2
+    )
+
+    error_message = "Informe exatamente duas Availability Zones distintas."
+  }
+}
+

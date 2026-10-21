@@ -1,21 +1,24 @@
-
 # ============================================================
-# SecureCorp AWS
-# Terraform - Network Foundation
-# Arquitetura Multi-AZ com acesso privado ao Amazon S3
+# SecureCorp AWS - Terraform Network Foundation
+# Cloud Engineering | Networking | Security | IaC
+#
+# Arquitetura:
+# - VPC 10.20.0.0/16
+# - 2 Availability Zones com identidades fixas
+# - 2 sub-redes publicas
+# - 2 sub-redes privadas isoladas
+# - Internet Gateway
+# - Tabelas de roteamento segregadas
+# - Gateway VPC Endpoint para Amazon S3
+# - Sem NAT Gateway
+# - Sem IP publico automatico
 # ============================================================
 
 # ------------------------------------------------------------
 # DATA SOURCES
 # ------------------------------------------------------------
 
-# Consulta a regiao AWS configurada no provider
 data "aws_region" "current" {}
-
-# Consulta as zonas de disponibilidade da regiao
-data "aws_availability_zones" "available" {
-  state = "available"
-}
 
 # ------------------------------------------------------------
 # LOCAL VARIABLES
@@ -24,8 +27,15 @@ data "aws_availability_zones" "available" {
 locals {
   project = var.project_name
 
-  az_a = data.aws_availability_zones.available.names[0]
-  az_b = data.aws_availability_zones.available.names[1]
+  # IDs de zonas fixados nas variaveis
+  az_a = var.availability_zone_ids[0]
+  az_b = var.availability_zone_ids[1]
+
+  common_tags = {
+    Project     = local.project
+    ManagedBy   = "Terraform"
+    Environment = "Lab"
+  }
 }
 
 # ------------------------------------------------------------
@@ -37,10 +47,9 @@ resource "aws_vpc" "securecorp" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
-    Name    = "SecureCorp-VPC"
-    Project = local.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-VPC"
+  })
 }
 
 # ------------------------------------------------------------
@@ -50,77 +59,77 @@ resource "aws_vpc" "securecorp" {
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.securecorp.id
 
-  tags = {
-    Name    = "SecureCorp-IGW"
-    Project = local.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-IGW"
+  })
 }
 
 # ------------------------------------------------------------
-# PUBLIC SUBNETS - TWO AVAILABILITY ZONES
+# PUBLIC SUBNET A
 # ------------------------------------------------------------
 
 resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.securecorp.id
   cidr_block              = "10.20.1.0/24"
-  availability_zone       = local.az_a
+  availability_zone_id    = local.az_a
   map_public_ip_on_launch = false
 
-  tags = {
-    Name    = "SecureCorp-Public-A"
-    Project = local.project
-    Tier    = "Public"
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Public-A"
+    Tier = "Public"
+  })
 }
+
+# ------------------------------------------------------------
+# PUBLIC SUBNET B
+# ------------------------------------------------------------
 
 resource "aws_subnet" "public_b" {
   vpc_id                  = aws_vpc.securecorp.id
   cidr_block              = "10.20.2.0/24"
-  availability_zone       = local.az_b
+  availability_zone_id    = local.az_b
   map_public_ip_on_launch = false
 
-  tags = {
-    Name    = "SecureCorp-Public-B"
-    Project = local.project
-    Tier    = "Public"
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Public-B"
+    Tier = "Public"
+  })
 }
 
 # ------------------------------------------------------------
-# PRIVATE ISOLATED SUBNETS
-# No automatic public IP assignment
-# No default route to the internet
+# PRIVATE ISOLATED SUBNET A
 # ------------------------------------------------------------
 
 resource "aws_subnet" "private_a" {
   vpc_id                  = aws_vpc.securecorp.id
   cidr_block              = "10.20.11.0/24"
-  availability_zone       = local.az_a
+  availability_zone_id    = local.az_a
   map_public_ip_on_launch = false
 
-  tags = {
-    Name    = "SecureCorp-Private-A"
-    Project = local.project
-    Tier    = "Isolated"
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Private-A"
+    Tier = "Isolated"
+  })
 }
+
+# ------------------------------------------------------------
+# PRIVATE ISOLATED SUBNET B
+# ------------------------------------------------------------
 
 resource "aws_subnet" "private_b" {
   vpc_id                  = aws_vpc.securecorp.id
   cidr_block              = "10.20.12.0/24"
-  availability_zone       = local.az_b
+  availability_zone_id    = local.az_b
   map_public_ip_on_launch = false
 
-  tags = {
-    Name    = "SecureCorp-Private-B"
-    Project = local.project
-    Tier    = "Isolated"
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Private-B"
+    Tier = "Isolated"
+  })
 }
 
 # ------------------------------------------------------------
 # PUBLIC ROUTE TABLE
-# Default route through Internet Gateway
 # ------------------------------------------------------------
 
 resource "aws_route_table" "public" {
@@ -131,19 +140,20 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.igw.id
   }
 
-  tags = {
-    Name    = "SecureCorp-Public-RT"
-    Project = local.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Public-RT"
+  })
 }
 
-# Associate public subnet A
+# ------------------------------------------------------------
+# PUBLIC ROUTE ASSOCIATIONS
+# ------------------------------------------------------------
+
 resource "aws_route_table_association" "public_a" {
   subnet_id      = aws_subnet.public_a.id
   route_table_id = aws_route_table.public.id
 }
 
-# Associate public subnet B
 resource "aws_route_table_association" "public_b" {
   subnet_id      = aws_subnet.public_b.id
   route_table_id = aws_route_table.public.id
@@ -151,25 +161,26 @@ resource "aws_route_table_association" "public_b" {
 
 # ------------------------------------------------------------
 # PRIVATE ISOLATED ROUTE TABLE
-# No route to Internet Gateway or NAT Gateway
+# Sem rota default para Internet ou NAT
 # ------------------------------------------------------------
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.securecorp.id
 
-  tags = {
-    Name    = "SecureCorp-Isolated-RT"
-    Project = local.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-Isolated-RT"
+  })
 }
 
-# Associate private subnet A
+# ------------------------------------------------------------
+# PRIVATE ROUTE ASSOCIATIONS
+# ------------------------------------------------------------
+
 resource "aws_route_table_association" "private_a" {
   subnet_id      = aws_subnet.private_a.id
   route_table_id = aws_route_table.private.id
 }
 
-# Associate private subnet B
 resource "aws_route_table_association" "private_b" {
   subnet_id      = aws_subnet.private_b.id
   route_table_id = aws_route_table.private.id
@@ -177,8 +188,7 @@ resource "aws_route_table_association" "private_b" {
 
 # ------------------------------------------------------------
 # AMAZON S3 GATEWAY VPC ENDPOINT
-# Private connectivity to Amazon S3
-# No NAT Gateway required
+# Acesso privado ao S3 sem NAT Gateway
 # ------------------------------------------------------------
 
 resource "aws_vpc_endpoint" "s3" {
@@ -192,12 +202,11 @@ resource "aws_vpc_endpoint" "s3" {
     aws_route_table.private.id
   ]
 
-  tags = {
-    Name    = "SecureCorp-S3-Endpoint"
-    Project = local.project
-  }
+  tags = merge(local.common_tags, {
+    Name = "SecureCorp-S3-Endpoint"
+  })
 }
 
 # ============================================================
-# END - SecureCorp Terraform Network Foundation
+# END - SECURECORP NETWORK FOUNDATION
 # ============================================================

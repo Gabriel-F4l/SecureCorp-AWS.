@@ -1,15 +1,35 @@
 
+# ============================================================
+# SecureCorp Automotive AWS
+# Terraform CI/CD - Infrastructure Security Validation
+#
+# Validacoes:
+# - Terraform Init
+# - Terraform Format
+# - Terraform Validate
+# - Checkov Security Scan
+#
+# Nenhum recurso AWS e provisionado automaticamente.
+# ============================================================
+
 name: SecureCorp Terraform CI
 
 on:
   push:
+    branches:
+      - main
+      - "feature/**"
     paths:
       - "terraform/**"
       - ".github/workflows/terraform-ci.yml"
+
   pull_request:
+    branches:
+      - main
     paths:
       - "terraform/**"
       - ".github/workflows/terraform-ci.yml"
+
   workflow_dispatch:
 
 permissions:
@@ -17,7 +37,7 @@ permissions:
 
 jobs:
   terraform-validation:
-    name: Terraform Validation
+    name: Terraform Validation and Security
     runs-on: ubuntu-latest
 
     defaults:
@@ -25,8 +45,17 @@ jobs:
         working-directory: terraform
 
     steps:
+
+      # ------------------------------------------------------
+      # 1. CHECKOUT
+      # ------------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # ------------------------------------------------------
+      # 2. SETUP TERRAFORM
+      # ------------------------------------------------------
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -34,11 +63,67 @@ jobs:
           terraform_version: "1.16.6"
           terraform_wrapper: false
 
+      # ------------------------------------------------------
+      # 3. TERRAFORM INIT
+      # ------------------------------------------------------
+
       - name: Terraform Init
         run: terraform init -backend=false -input=false
+
+      # ------------------------------------------------------
+      # 4. TERRAFORM FORMAT
+      # ------------------------------------------------------
 
       - name: Terraform Format
         run: terraform fmt -check -recursive
 
+      # ------------------------------------------------------
+      # 5. TERRAFORM VALIDATE
+      # ------------------------------------------------------
+
       - name: Terraform Validate
         run: terraform validate -no-color
+
+      # ------------------------------------------------------
+      # 6. SETUP PYTHON
+      # ------------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # ------------------------------------------------------
+      # 7. INSTALL CHECKOV
+      # ------------------------------------------------------
+
+      - name: Install Checkov
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install checkov==3.3.30
+
+      # ------------------------------------------------------
+      # 8. CHECKOV SECURITY SCAN
+      # ------------------------------------------------------
+
+      - name: Checkov Security Scan
+        run: |
+          checkov -d . \
+            --framework terraform \
+            --download-external-modules false \
+            --quiet \
+            --compact
+
+      # ------------------------------------------------------
+      # 9. SUCCESS MESSAGE
+      # ------------------------------------------------------
+
+      - name: Security Validation Completed
+        if: success()
+        run: |
+          echo "SecureCorp Terraform validation completed."
+          echo "Terraform configuration is valid."
+          echo "Checkov security scan passed."
+          echo "No AWS resources were deployed."
