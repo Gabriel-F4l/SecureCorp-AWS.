@@ -177,26 +177,52 @@ SecureCorp-AWS./
 └── README.md
 ```
 
-## 🗺️ Roadmap
+## 🏆 Project Completion — SecureCorp AWS v1.0
 
-- [x] Model multi-AZ AWS networking with CDK and Terraform
-- [x] Define private S3 access and baseline security controls
-- [x] Add VPC Flow Logs, KMS encryption and log retention to Terraform
-- [x] Add Python tests and infrastructure security auditing
-- [x] Automate CDK synthesis, Terraform validation and Checkov with GitHub Actions
-- [x] Add an architecture diagram and document the design decisions
-- [ ] Resolve the Security Group association exception in a future deployment design
-- [ ] Strengthen CI by making selected lint/security checks blocking
-- [ ] Evaluate a cost-controlled deployment, runtime validation and teardown strategy
+**Status: COMPLETED — Infrastructure as Code laboratory**
+
+I designed and developed SecureCorp AWS as a hands-on Cloud Engineering and Cloud Security project. Version 1.0 is complete within its defined scope: **infrastructure design, security controls, automated validation, and technical documentation**.
+
+### ✅ Completed deliverables
+
+- [x] Design a secure AWS network architecture spanning two Availability Zones.
+- [x] Define infrastructure with AWS CDK (Python) and Terraform.
+- [x] Configure public and isolated private subnets and an S3 Gateway VPC Endpoint.
+- [x] Define private S3 storage, scoped IAM permissions, and restrictive Security Groups.
+- [x] Configure VPC Flow Logs, CloudWatch Logs, and KMS encryption in Terraform.
+- [x] Implement automated infrastructure tests and security auditing.
+- [x] Integrate GitHub Actions workflows for CDK and Terraform validation, including Checkov.
+- [x] Publish architecture diagrams and technical documentation.
+- [x] Complete the SecureCorp AWS v1.0 IaC laboratory.
+
+### 📊 Final validation snapshot
+
+| Validation | Result |
+|---|---|
+| Python / Pytest | **13 passed** |
+| Terraform configuration | **Valid** |
+| Checkov Terraform scan | **40 passed · 0 failed · 1 documented skip** |
+| GitHub Actions | **CI validation passed** |
+| Live AWS deployment | **Not performed (out of scope)** |
+
+> **Scope and limitations:** This is a completed **IaC validation project**, not a deployed or production-certified environment. The Checkov exception `CKV2_AWS_5` for an unattached application Security Group remains documented; informational lint/security checks are not all blocking.
 
 ## 👨‍💻 Project author
 
-Built by **[Gabriel Alexandre](https://github.com/Gabriel-F4l)** as a hands-on **Cloud Engineering / Cloud Security** portfolio project.
+### Designed and developed by [Gabriel Alexandre](https://github.com/Gabriel-F4l)
+
+I designed and developed **SecureCorp AWS**, taking responsibility for its cloud architecture, Infrastructure as Code definitions, security controls, automated tests, CI validation workflows, and technical documentation.
+
+This project demonstrates practical work with **AWS, Terraform, Python, AWS CDK, GitHub Actions, and DevSecOps practices**, with an emphasis on secure and maintainable infrastructure design.
+
+**Cloud Engineering · AWS · Terraform · Python · DevSecOps · Cloud Security**
 
 <div align="center">
 
 ---
 
-**Build securely. Validate continuously. Improve deliberately.**
+**SecureCorp AWS v1.0 · Completed IaC Laboratory · 2026**
+
+*Designed and developed by Gabriel Alexandre.*
 
 </div>
