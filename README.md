@@ -177,21 +177,45 @@ SecureCorp-AWS./
 └── README.md
 ```
 
-## 🗺️ Roadmap
+🏆 Project Completion — SecureCorp AWS v1.0
 
-- [x] Model multi-AZ AWS networking with CDK and Terraform
-- [x] Define private S3 access and baseline security controls
-- [x] Add VPC Flow Logs, KMS encryption and log retention to Terraform
-- [x] Add Python tests and infrastructure security auditing
-- [x] Automate CDK synthesis, Terraform validation and Checkov with GitHub Actions
-- [x] Add an architecture diagram and document the design decisions
-- [ ] Resolve the Security Group association exception in a future deployment design
-- [ ] Strengthen CI by making selected lint/security checks blocking
-- [ ] Evaluate a cost-controlled deployment, runtime validation and teardown strategy
+Project Status: COMPLETED
 
-## 👨‍💻 Project author
+SecureCorp AWS was designed and developed as a practical Cloud Engineering and Cloud Security project, demonstrating secure AWS architecture, Infrastructure as Code, automated validation, and DevSecOps practices.
 
-Built by **[Gabriel Alexandre](https://github.com/Gabriel-F4l)** as a hands-on **Cloud Engineering / Cloud Security** portfolio project.
+✅ Completed Deliverables
+
+Design a secure AWS architecture across two Availability Zones.
+
+Develop infrastructure using AWS CDK, Python, and Terraform.
+
+Configure VPC networking, public and isolated private subnets.
+
+Define secure S3 access through a Gateway VPC Endpoint.
+
+Implement IAM policies and restrictive Security Groups.
+
+Configure VPC Flow Logs, CloudWatch Logs, and AWS KMS encryption.
+
+Develop and execute automated infrastructure tests with Pytest.
+
+Integrate GitHub Actions and Checkov for automated security validation.
+
+Create architecture diagrams and technical documentation.
+
+Complete and document the SecureCorp AWS v1.0 laboratory.
+
+👨‍💻 Project Author
+
+Developed by Gabriel Alexandre
+
+I designed and developed SecureCorp AWS as a hands-on Cloud Engineering and Cloud Security portfolio project, taking responsibility for the infrastructure architecture, Infrastructure as Code implementation, security controls, automated testing, CI/CD pipelines, and technical documentation.
+
+The project demonstrates my practical experience with AWS, Terraform, Python, AWS CDK, GitHub Actions, and DevSecOps principles, reflecting my commitment to building secure, scalable, and well-documented cloud infrastructure.
+
+Cloud Engineering | AWS | Terraform | Python | DevSecOps | Cloud Security
+
+Designed and developed by Gabriel Alexandre — SecureCorp AWS © 2026
 
 <div align="center">
 
