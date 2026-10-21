@@ -31,6 +31,11 @@
 
 ## 🏗️ Architecture
 
+![SecureCorp AWS architecture overview](docs/architecture.svg)
+
+*Architecture overview — infrastructure defined as code; not deployed.*
+
+
 ```mermaid
 flowchart TB
   DEV["Developer / Pull Request"] --> CI["GitHub Actions"]
@@ -179,7 +184,7 @@ SecureCorp-AWS./
 - [x] Add VPC Flow Logs, KMS encryption and log retention to Terraform
 - [x] Add Python tests and infrastructure security auditing
 - [x] Automate CDK synthesis, Terraform validation and Checkov with GitHub Actions
-- [ ] Add dedicated architecture images and detailed design decisions
+- [x] Add an architecture diagram and document the design decisions
 - [ ] Resolve the Security Group association exception in a future deployment design
 - [ ] Strengthen CI by making selected lint/security checks blocking
 - [ ] Evaluate a cost-controlled deployment, runtime validation and teardown strategy
