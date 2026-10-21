@@ -1,90 +1,115 @@
 <div align="center">
 
 # ☁️ SecureCorp AWS
+### Secure Cloud Architecture • Infrastructure as Code • DevSecOps
 
-### Secure Cloud Infrastructure · Infrastructure as Code · Security by Design
+**An AWS cloud-engineering lab designed with security in mind — from network isolation to automated quality gates.**
 
-**A hands-on AWS architecture project focused on secure networking, private storage, and automated validation.**
+![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?style=for-the-badge&logo=terraform&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![AWS CDK](https://img.shields.io/badge/AWS_CDK-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
+![Checkov](https://img.shields.io/badge/Checkov-IaC_Security-147D64?style=for-the-badge)
 
-![AWS](https://img.shields.io/badge/AWS-Cloud-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white)
-![Python](https://img.shields.io/badge/Python-IaC-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![AWS CDK](https://img.shields.io/badge/AWS_CDK-Infrastructure_as_Code-FF9900?style=for-the-badge)
-![Security](https://img.shields.io/badge/Security-By_Design-147D64?style=for-the-badge)
+[**Architecture**](#-architecture) · [**Security**](#-security-by-design) · [**CI/CD**](#-automated-quality-gates) · [**Run locally**](#-getting-started) · [**Roadmap**](#-roadmap)
 
-[Architecture](#-architecture) · [Security](#-security-controls) · [Getting Started](#-getting-started) · [Validation](#-validation) · [Roadmap](#-roadmap)
+> **Lab status:** Infrastructure defined and tested as code. **No production deployment or live AWS workload is claimed.**
 
 </div>
 
 ---
 
-## 🎯 Overview
+## ✨ At a glance
 
-**SecureCorp AWS** is a practical infrastructure-as-code portfolio project built with **AWS CDK and Python**. It explores network isolation, least-privilege access, secure object storage, and repeatable infrastructure validation.
+| 🧪 Python tests | 🛡️ Terraform security scan | ⚙️ Automation |
+|:---:|:---:|:---:|
+| **13 passed** | **40 passed · 0 failed · 1 documented skip** | **GitHub Actions CI** |
+| Last reported local run | Last reported local Checkov run | CDK and Terraform workflows |
 
-> **Deployment status:** This repository defines and validates AWS infrastructure as code. Resources are **not claimed to be deployed** to a live AWS account.
+**SecureCorp AWS** is a portfolio lab exploring how to build a secure, auditable cloud foundation with **AWS CDK (Python)** and **Terraform**. Both IaC implementations live in this repository; they are **separate configurations**, not a single deployed stack.
 
 ## 🏗️ Architecture
 
 ```mermaid
 flowchart TB
-    CDK["Python + AWS CDK"] --> VPC["Amazon VPC<br/>10.20.0.0/16"]
-    VPC --> AZ1["Availability Zone A"]
-    VPC --> AZ2["Availability Zone B"]
-    AZ1 --> PUB1["Public subnet"]
-    AZ1 --> PRIV1["Isolated private subnet"]
-    AZ2 --> PUB2["Public subnet"]
-    AZ2 --> PRIV2["Isolated private subnet"]
-    PRIV1 --> EP["S3 Gateway VPC Endpoint"]
-    PRIV2 --> EP
-    EP --> S3["Private Amazon S3 bucket"]
-    IAM["Least-privilege IAM role"] -. "Scoped GetObject" .-> S3
-    POLICY["HTTPS / Public Access Block<br/>Endpoint restriction"] -.-> S3
+  DEV["Developer / Pull Request"] --> CI["GitHub Actions"]
+  CI --> CDK["AWS CDK + Python"]
+  CI --> TF["Terraform + Checkov"]
+  CDK -. "Synthesized CloudFormation" .-> VPC
+  TF -. "Defined infrastructure" .-> VPC
+
+  subgraph VPC["Amazon VPC • 10.20.0.0/16"]
+    direction TB
+    IGW["Internet Gateway"]
+    subgraph AZA["Availability Zone A"]
+      PA["Public subnet • 10.20.1.0/24"]
+      IA["Isolated subnet • 10.20.11.0/24"]
+    end
+    subgraph AZB["Availability Zone B"]
+      PB["Public subnet • 10.20.2.0/24"]
+      IB["Isolated subnet • 10.20.12.0/24"]
+    end
+    IGW --> PA
+    IGW --> PB
+    IA --> EP["S3 Gateway VPC Endpoint"]
+    IB --> EP
+  end
+
+  EP --> S3["Amazon S3 • Private object storage"]
+  VPC -. "VPC Flow Logs" .-> CW["CloudWatch Logs • 365-day retention"]
+  KMS["AWS KMS • Key rotation"] -. "Encrypts logs" .-> CW
+  IAM["IAM / Security Groups"] -. "Least-privilege controls" .-> VPC
 ```
 
-### Architecture highlights
+> **Architecture is illustrative, not a live topology.** The S3 bucket and scoped IAM permissions are modeled in the CDK portion; the VPC Flow Logs, KMS log encryption, and network resources shown above are defined in Terraform. The private subnets have no default internet route or NAT Gateway. Public subnets have an Internet Gateway route but do not assign public IPs automatically.
 
-| Component | Design |
-| --- | --- |
-| **Amazon VPC** | `10.20.0.0/16`, spanning two Availability Zones |
-| **Subnets** | Public and isolated private subnet tiers |
-| **NAT Gateway** | Not provisioned in the current design |
-| **S3 Gateway Endpoint** | Private route for S3 traffic from the isolated subnets |
-| **Security Group** | Restrictive inbound and outbound rules |
-| **IAM** | Scoped S3 object-read permissions |
-| **S3** | Private bucket with encryption, versioning, and transport controls |
+### Network foundation
 
-## 🔐 Security Controls
+| Layer | Design choice |
+|---|---|
+| **VPC** | `10.20.0.0/16`, two Availability Zones |
+| **Public subnets** | `10.20.1.0/24` and `10.20.2.0/24` |
+| **Isolated subnets** | `10.20.11.0/24` and `10.20.12.0/24` |
+| **Private S3 access** | Gateway VPC Endpoint associated with the isolated route table |
+| **Internet access** | No NAT Gateway; no default internet route in isolated subnets |
+| **Security groups** | Deny-by-default ingress; scoped HTTPS egress to S3 prefix list |
+| **Observability** | VPC Flow Logs to CloudWatch Logs with KMS and retention |
 
-| Control | Implementation / intention |
-| --- | --- |
-| Block public S3 access | S3 Block Public Access enabled |
-| Encrypt data at rest | S3 server-side encryption (AES-256) |
-| Enforce encryption in transit | Bucket policy denies insecure transport |
-| Object versioning | Enabled |
-| Private network access | S3 Gateway Endpoint with endpoint-based policy restrictions |
-| Least privilege | Narrowly scoped IAM permissions and security-group rules |
-| Resource retention | Bucket retention policy configured |
+## 🔐 Security by design
 
-> Security settings should be verified against the synthesized CloudFormation template and automated checks before any deployment. Network reachability alone does not validate application-level security.
+| Control | Configuration |
+|---|---|
+| **S3 public access** | Block Public Access |
+| **S3 encryption** | Server-side AES-256 encryption |
+| **S3 transport** | Bucket policy denying insecure transport |
+| **S3 resilience** | Object versioning and retention-oriented design |
+| **Private connectivity** | S3 Gateway Endpoint for isolated subnets |
+| **Least privilege** | Restricted IAM permissions and Security Group egress |
+| **Network audit** | VPC Flow Logs capturing accepted and rejected traffic |
+| **Log protection** | KMS encryption, automatic key rotation, 365-day log retention |
+| **IaC scanning** | Checkov in the Terraform CI workflow |
 
-## 🛠️ Tech Stack
+**Known exception:** `CKV2_AWS_5` is explicitly skipped because the application Security Group is reserved for a future private EC2/ENI. This is **not** proof of remediation; remove the exception once the group is attached.
 
-- **Cloud:** Amazon Web Services (VPC, IAM, S3, VPC Endpoints)
-- **Infrastructure as Code:** AWS CDK, CloudFormation
-- **Language:** Python
-- **Quality & Security:** Python tests and infrastructure security checks
-- **Version control:** Git and GitHub
+## ⚙️ Automated quality gates
 
-## 🚀 Getting Started
+Two GitHub Actions workflows are maintained:
 
-### Prerequisites
+| Workflow | Checks |
+|---|---|
+| [**AWS Security CI**](.github/workflows/security-ci.yml) | Python syntax, CDK synthesis, CloudFormation template inspection, Pytest, security audit; Bandit and Ruff as informational checks |
+| [**Terraform CI**](.github/workflows/terraform-ci.yml) | `terraform init`, `fmt -check`, `validate`, Checkov scan |
 
-- Python 3
-- Node.js and npm
-- AWS CDK CLI (`npm install -g aws-cdk`)
-- AWS credentials **only if** you intend to interact with an AWS account
+> **No `terraform apply` or `cdk deploy` runs in these workflows.** Bandit and Ruff currently use `continue-on-error`, so their findings do not fail the pipeline.
 
-### Local setup (PowerShell)
+## 🚀 Getting started
+
+### Requirements
+
+- Python 3.12 recommended; Node.js and npm
+- AWS CDK CLI and Terraform (the CI workflow uses Terraform 1.16.6)
+- AWS credentials only for account-dependent operations; static checks do not require deployment credentials
 
 ```powershell
 git clone https://github.com/Gabriel-F4l/SecureCorp-AWS..git
@@ -92,63 +117,81 @@ cd SecureCorp-AWS.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
+npm install -g aws-cdk
 ```
 
-> The repository name currently ends with a period (`SecureCorp-AWS.`). This is intentional in the clone URL above.
+**Note:** The GitHub repository name actually ends in a period (`SecureCorp-AWS.`), hence the double dot before `.git` in the clone URL.
 
-### Synthesize infrastructure locally
+### Validate CDK and Python
 
 ```powershell
+python -m pytest -q
+python audit_security.py
 cdk synth
 ```
 
-Some CDK context values, including the S3 prefix-list identifier, may need to be provided according to the project's configuration. Review `cdk.json` and the stack source before running synthesis.
+CDK synthesis may require context values documented in `cdk.json` and the stack source.
 
-## 🧪 Validation
-
-The repository includes Python test code and a security-audit script. Inspect the scripts and their dependencies before running them.
+### Validate Terraform without deploying
 
 ```powershell
-python -m pip install -r requirements-dev.txt
-python -m pytest
-python audit_security.py
+terraform -chdir=terraform init -backend=false
+terraform -chdir=terraform fmt -check -recursive
+terraform -chdir=terraform validate
+checkov -d terraform --framework terraform --download-external-modules false --compact
 ```
 
-A successful synthesis or test run validates specific definitions and assertions; it does **not** prove that the infrastructure has been deployed or penetration-tested.
+Some provider data sources and planning operations may require AWS credentials. **Do not run `terraform apply` or `cdk deploy` unless you have reviewed the plan and potential costs.** KMS, CloudWatch and other deployed resources can incur charges.
 
-## 📂 Project Structure
+## 📁 Repository map
 
 ```text
-SecureCorp-AWS/
+SecureCorp-AWS./
+├── .github/workflows/
+│   ├── security-ci.yml
+│   └── terraform-ci.yml
+├── docs/
+│   └── security-ci-runbook.md
+├── secure_corp_aws/
+│   └── secure_corp_aws_stack.py
+├── terraform/
+│   ├── main.tf
+│   ├── security_groups.tf
+│   ├── flow_logs.tf
+│   ├── providers.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── versions.tf
+├── tests/
 ├── app.py
 ├── audit_security.py
 ├── cdk.json
 ├── requirements.txt
 ├── requirements-dev.txt
-├── secure_corp_aws/
-├── tests/
 └── README.md
 ```
 
 ## 🗺️ Roadmap
 
-- [x] Define AWS infrastructure with Python CDK
-- [x] Model a two-AZ VPC and isolated private subnet architecture
-- [x] Add private S3 access and baseline security controls
-- [x] Add security-oriented checks and tests
-- [ ] Integrate GitHub Actions for automated tests and CDK synthesis
-- [ ] Add automated static/security scanning
-- [ ] Expand architecture documentation and operational runbooks
-- [ ] Evaluate a controlled deployment and monitoring strategy
+- [x] Model multi-AZ AWS networking with CDK and Terraform
+- [x] Define private S3 access and baseline security controls
+- [x] Add VPC Flow Logs, KMS encryption and log retention to Terraform
+- [x] Add Python tests and infrastructure security auditing
+- [x] Automate CDK synthesis, Terraform validation and Checkov with GitHub Actions
+- [ ] Add dedicated architecture images and detailed design decisions
+- [ ] Resolve the Security Group association exception in a future deployment design
+- [ ] Strengthen CI by making selected lint/security checks blocking
+- [ ] Evaluate a cost-controlled deployment, runtime validation and teardown strategy
 
-## 👨‍💻 About the Project
+## 👨‍💻 Project author
 
-Built as a practical cloud-engineering portfolio project to demonstrate **Infrastructure as Code, secure AWS design, and engineering discipline**.
-
----
+Built by **[Gabriel Alexandre](https://github.com/Gabriel-F4l)** as a hands-on **Cloud Engineering / Cloud Security** portfolio project.
 
 <div align="center">
 
-**SecureCorp AWS — Build securely. Validate continuously.**
+---
+
+**Build securely. Validate continuously. Improve deliberately.**
 
 </div>
