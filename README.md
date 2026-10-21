@@ -31,6 +31,11 @@
 
 ## 🏗️ Architecture
 
+![SecureCorp AWS architecture overview](docs/architecture.svg)
+
+*Architecture overview — infrastructure defined as code; not deployed.*
+
+
 ```mermaid
 flowchart TB
   DEV["Developer / Pull Request"] --> CI["GitHub Actions"]
